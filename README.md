@@ -1,6 +1,6 @@
 # ThermoOmniFlux
 
-A Python-based analysis pipeline for thermal digital PCR (dPCR) fluorescence microscopy data, customized for ThermoOmniFlux systems. This repository contains Jupyter notebooks and a utility library to process raw image data, extract melting temperatures (Tm) for probes, and perform clustering analysis.
+ Python-based analysis pipeline for thermal digital PCR (dPCR) fluorescence microscopy data, tailored to ThermoOmniFlux systems. The repository includes Jupyter notebooks and a supporting utility library for processing raw image data, extracting melting temperatures (Tm) from molecule melting profiles, and performing downstream clustering analyses.
 
 ## Project Structure
 
@@ -14,13 +14,13 @@ A Python-based analysis pipeline for thermal digital PCR (dPCR) fluorescence mic
 
 ## Files
 
-**`utils.py`**: Core library providing image I/O, preprocessing, well/spot detection, keypoint tracking, fluorescence extraction, melting curve computation, clustering, and data assembly. All functions called by the notebooks are sourced here.
+**`utils.py`**: Core library providing image I/O, preprocessing, well localization, well location tracking, fluorescence extraction, melting curve signal processing, clustering, and data assembly. All functions called by the notebooks are sourced here.
 
 **`EvaGreen_Based_Processing_Pipeline.ipynb`**: Step-by-step workflow demonstrating the complete analysis from raw microscopy images to per-well melting profiles. Includes interactive parameter tuning and visualizations at each stage.
 
-**`Pooling_Clustering.ipynb`**: Secondary analysis notebook for clustering analysis of molecule melting signal profiles, Tm distribution exploration, and result visualization.
+**`Pooling_Clustering.ipynb`**: Secondary analysis notebook for clustering analysis of molecule melting signal profiles, Tm distribution exploration, molecule identification, and result visualization.
 
-## Workflow
+## General Workflow
 
 ### Pipeline (EvaGreen_Based_Processing_Pipeline.ipynb)
 
@@ -33,29 +33,39 @@ A Python-based analysis pipeline for thermal digital PCR (dPCR) fluorescence mic
    - Track fluorescent spots across frames
    - Extract intensities over time
 
-3. **Compute Tm**
+3. **Compute Global Tm**
    - Smooth fluorescence curves
    - Detect peaks and inflection points
    - Calculate melting temperatures
    - Filter by signal quality and Tm range
 
-4. **Consolidate Results**
+4. **Color Channel Splitting/Compute Local Tm**
+    - Separate color channels if applicable
+    - Repeat Tm calculation per channel if applicable
+
+5. **Results Compilation and Saving**
    - Combine Tm, position, and confidence data
    - Export to DataFrame
 
 ### Analysis (Pooling_Clustering.ipynb)
 
-1. **Cluster Signals**
-   - Group probe signals by similarity
-   - Visualize cluster assignments
+1. **Load Data**
+   - Import Tm results from previous pipeline
 
-2. **Explore Distributions**
-   - Plot Tm histograms and distributions
-   - Compare against expected Tm values
+2. **Pooling**
+   - Aggregate data across chips
+   - Align data accounting for experimental batch effects
+   - Prepare for clustering
 
-3. **Generate Figures**
-   - Create publication-ready plots
-   - Export results for reporting
+3. **Clustering**  
+   - Match with predicted melting profiles
+   - Apply Greedy Surjective Matching algorithm
+   - Identify moelcules based on Tm profiles
+
+4. **Statistics and Visualization** 
+    - Plot Tm distributions
+    - Visualize clustering results
+    - Generate summary statistics
 
 ## Dependencies
 
