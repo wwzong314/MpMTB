@@ -77,6 +77,17 @@
 - **Widgets**: IPywidgets
 - **Progress**: tqdm
 
+### Setting Up the Environment
+
+An `environment.yml` file is included to set up a conda environment with all required dependencies:
+
+```bash
+conda env create -f environment.yml
+conda activate thermoomniflux
+```
+
+This will create and activate a conda environment named `thermoomniflux` with all necessary packages pre-configured.
+
 ## Quick Start
 
 1. Open `EvaGreen_Based_Processing_Pipeline.ipynb` in Jupyter
