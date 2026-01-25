@@ -10,19 +10,24 @@
 └── jupyter_notebooks/
     ├── EvaGreen_Based_Processing_Pipeline.ipynb   # Image processing workflow
     └── Pooling_Clustering.ipynb                   # Clustering and analysis
+    └── Direct_Clustering.ipynb                   # Clustering and analysis without pooling
+    
 ```
+
 
 ## Files
 
 **`utils.py`**: Core library providing image I/O, preprocessing, well localization, well location tracking, fluorescence extraction, melting curve signal processing, clustering, and data assembly. All functions called by the notebooks are sourced here.
 
-**`EvaGreen_Based_Processing_Pipeline.ipynb`**: Step-by-step workflow demonstrating the complete analysis from raw microscopy images to per-well melting profiles. Includes interactive parameter tuning and visualizations at each stage.
+**`Image_Processing_Pipeline.ipynb`**: Step-by-step workflow demonstrating the complete analysis from raw microscopy images to per-well melting profiles. Includes interactive parameter tuning and visualizations at each stage.
 
 **`Pooling_Clustering.ipynb`**: Secondary analysis notebook for clustering analysis of molecule melting signal profiles, Tm distribution exploration, molecule identification, and result visualization.
 
+**`Direct_Clustering.ipynb`**: Similar to `Pooling_Clustering.ipynb`, but designed for direct clustering of Tm results without prior pooling of multiple imaging areas.
+
 ## General Workflow
 
-### Pipeline (EvaGreen_Based_Processing_Pipeline.ipynb)
+### Pipeline (Image_Processing_Pipeline.ipynb)
 
 1. **Load & Preprocess**
    - Import TIFF/CZI images
@@ -47,7 +52,7 @@
    - Combine Tm, position, and confidence data
    - Export to DataFrame
 
-### Analysis (Pooling_Clustering.ipynb)
+### Analysis (Pooling_Clustering.ipynb or Direct_Clustering.ipynb)
 
 1. **Load Data**
    - Import Tm results from previous pipeline
@@ -95,10 +100,18 @@ This will create and activate a conda environment named `thermoomniflux` with al
 3. Run cells sequentially to process images and extract Tm values
 4. Use `Pooling_Clustering.ipynb` for downstream analysis and visualization
 
+## Configurable Parameters
+
+Common tuning parameters:
+- `k0`, `k1`: Must be set based on microscope magnification and pixel size. Some reference values are provided in the notebooks.
+- `pixel_range`: Search radius for well detection. Set according to well spacing. Generally greater than `k0` and `k1`.
+- `n_SD`: Number of standard deviations for noise floor threshold. Adjust based on image quality.
+- `heating_rate_per_min`: Temperature increase rate (°C/min). Adjust based on experimental setup.
+- `exposure_in_sec`: Time between consecutive frames. Adjust based on camera settings.
+- `window_length`: Smoothing window length for Savitzky-Golay filter. Adjust based on expected width of melting transitions and signal noise level.
+
+
 ## License
 
-
-
 ## Contact
-
 
