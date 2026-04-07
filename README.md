@@ -38,7 +38,7 @@
    - Track fluorescent spots across frames
    - Extract intensities over time
 
-3. **Compute Global Tm**
+3. **Compute Barcode Tm**
    - Smooth fluorescence curves
    - Detect peaks and inflection points
    - Calculate melting temperatures
@@ -91,7 +91,7 @@ conda env create -f environment.yml
 conda activate thermoomniflux
 ```
 
-This will create and activate a conda environment named `thermoomniflux` with all necessary packages pre-configured.
+This will create and activate a conda environment named `MpMTB` with all necessary packages pre-configured.
 
 ## Quick Start
 
