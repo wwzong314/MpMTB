@@ -1,4 +1,5 @@
-# ThermoOmniFlux
+#MpMTB
+
 
  Python-based analysis pipeline for thermal digital PCR (dPCR) fluorescence microscopy data, tailored to ThermoOmniFlux systems. The repository includes Jupyter notebooks and a supporting utility library for processing raw image data, extracting melting temperatures (Tm) from molecule melting profiles, and performing downstream clustering analyses.
 
