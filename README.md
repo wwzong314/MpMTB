@@ -1,6 +1,6 @@
 # ThermoOmniFlux
 
- Python-based analysis pipeline for thermal digital PCR (dPCR) fluorescence microscopy data, tailored to ThermoOmniFlux systems. The repository includes Jupyter notebooks and a supporting utility library for processing raw image data, extracting melting temperatures (Tm) from molecule melting profiles, and performing downstream clustering analyses.
+ Python-based analysis pipeline for thermal digital PCR (dPCR) fluorescence microscopy data, tailored to MpMTB systems. The repository includes Jupyter notebooks and a supporting utility library for processing raw image data, extracting melting temperatures (Tm) from molecule melting profiles, and performing downstream clustering analyses.
 
 ## Project Structure
 
@@ -91,7 +91,7 @@ conda env create -f environment.yml
 conda activate thermoomniflux
 ```
 
-This will create and activate a conda environment named `thermoomniflux` with all necessary packages pre-configured.
+This will create and activate a conda environment named `MpMTB` with all necessary packages pre-configured.
 
 ## Quick Start
 
