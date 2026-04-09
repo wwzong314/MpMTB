@@ -390,102 +390,154 @@ def define_the_rain_kmeans(fluorescence_vals: np.ndarray, n_SD: float = 3.0, rai
 
 
 
-from sklearn.preprocessing import RobustScaler, StandardScaler
 
-def define_the_rain(first_frame_img: np.ndarray, all_pos_seq: list, n_SD: float = 3.0, rain: bool = True, return_positive_fluorescence: bool = False, pix_range: int = 21):
-    """Function that creates positive, rain, and negative partitions based on Global Tm Channel Start Intensity
+def _compute_local_thresholds(fluorescence_vals: np.ndarray,
+                              n_SD: float = 3.0,
+                              half_win: int = 50) -> np.ndarray:
+    """
+    Vectorised helper that learns a *local* positive threshold around every
+    index by running `define_the_rain_kmeans` inside an overlapping window.
 
-    Args:
-    first_frame_img (np.array): The first frame image
-    all_pos_seq (list): The list of all positions
-    n_SD (float): The number of standard deviations to use for thresholding. Default is 3.0
-    rain (bool): Whether to consider rain in the clustering. Default is True.
+    Parameters
+    ----------
+    fluorescence_vals : 1-D np.ndarray
+    n_SD              : Same meaning as elsewhere
+    half_win          : Radius of the sliding window (win = 2·half_win + 1)
 
-    Returns:
-    np.array: The positive indices
-    np.array: The rain indices (if rain is True)
-    np.array: The negative indices
-    np.array: The positive positions
-    np.array: The rain positions (if rain is True)
-    np.array: The negative positions
+    Returns
+    -------
+    local_thr : np.ndarray of length len(fluorescence_vals)
+                The i-th element is the positive threshold inferred from the
+                window centred on index i.
+    """
+    N          = len(fluorescence_vals)
+    local_thr  = np.empty(N, dtype=float)
+
+    for i in range(N):
+        lo     = max(0, i - half_win)
+        hi     = min(N, i + half_win + 1)          # slice upper bound is excl.
+        pos_thr, _ = define_the_rain_kmeans(
+                        fluorescence_vals[lo:hi],
+                        n_SD=n_SD,
+                        rain=False                 # only need the positive cut
+                     )
+        local_thr[i] = pos_thr
+
+    return local_thr
+
+def define_the_rain(first_frame_img       : np.ndarray,
+                    all_pos_seq           : list,
+                    n_SD                  : float  = 3.0,
+                    rain                  : bool   = True,
+                    return_positive_fluorescence: bool = False,
+                    pix_range             : int    = 21,
+                    frame_name            = None,
+                    *,
+                    adaptive              : bool   = False,
+                    half_win              : int    = 50):
+    """
+    Partition wells into positive / rain / negative based on the start-frame
+    fluorescence.  If `adaptive=True`, the positive threshold is allowed to
+    vary along the well index, producing a *curve* instead of a single line.
+
+    New keyword-only arguments
+    --------------------------
+    adaptive : bool   – Turn the sliding-window algorithm on/off (default OFF
+                         to preserve backward behaviour).
+    half_win : int    – Window radius used when `adaptive=True`.
+
+    All other parameters keep their previous meaning.
     """
     image = gaussian_background_correction(first_frame_img)
-    # image = first_frame_img
-    raw_fluorescence_vals = generate_fluorescence_vs_time(
-        img_arr=np.expand_dims(image, 0),
-        pts_seq=np.expand_dims(all_pos_seq[0], 1),
-        pix_range=pix_range,
-        filter="None", sigma=12, gaussian=True)
-    raw_fluorescence_vals = min_max_normalize(raw_fluorescence_vals, use_global_min_max=True)
+    raw_vals = generate_fluorescence_vs_time(
+                   img_arr  = np.expand_dims(image, 0),
+                   pts_seq  = np.expand_dims(all_pos_seq[0], 1),
+                   pix_range= pix_range,
+                   filter   = "None", sigma=12, gaussian=True)
+    raw_vals = min_max_normalize(raw_vals, use_global_min_max=True)
 
+    # >>> ADD THIS ONE LINE <<<   – guarantees a 1-D float array
+    raw_vals = np.asarray(raw_vals, dtype=float).flatten()
 
-    positive_threshold, rain_threshold = define_the_rain_kmeans(raw_fluorescence_vals, n_SD, rain=rain)
+    if adaptive:                                # ← NEW BRANCH
+        local_thr = _compute_local_thresholds(raw_vals, n_SD=n_SD,
+                                              half_win=half_win)
+        positives = raw_vals >= local_thr
+        negatives = raw_vals <  local_thr
+        # for plotting only
+        positive_threshold = local_thr
+        rain_threshold     = None              # rain not supported here
+        rain_mask          = np.array([], dtype=bool)
+    else:                                       # ← ORIGINAL BEHAVIOUR
+        positive_threshold, rain_threshold = define_the_rain_kmeans(
+                                                 raw_vals, n_SD, rain=rain)
+        if rain and positive_threshold < rain_threshold:
+            positive_threshold = rain_threshold
 
-    if rain and positive_threshold < rain_threshold:
-        positive_threshold = rain_threshold
+        positives  = raw_vals >= positive_threshold
+        negatives  = raw_vals <  (rain_threshold if rain else
+                                   positive_threshold)
+        rain_mask  = ((raw_vals > rain_threshold) &
+                      (raw_vals <= positive_threshold)) if rain else np.array([])
 
-    positives = raw_fluorescence_vals >= positive_threshold
-    negatives = raw_fluorescence_vals < (rain_threshold if rain else positive_threshold)
-    
-    if rain:
-        rain_mask = (raw_fluorescence_vals > rain_threshold) & (raw_fluorescence_vals <= positive_threshold)
-    else:
-        rain_mask = np.array([])
-
-    positive_count = np.sum(positives)
-    negative_count = np.sum(negatives)
-    rain_count = np.sum(rain_mask) if rain else 0
-
-    total_count = len(raw_fluorescence_vals)
-    positive_percentage = positive_count / total_count * 100
-    negative_percentage = negative_count / total_count * 100
-    rain_percentage = rain_count / total_count * 100 if rain else 0
+    pos_cnt  = positives.sum()
+    neg_cnt  = negatives.sum()
+    rain_cnt = rain_mask.sum() if rain else 0
+    total    = len(raw_vals)
 
     plt.figure(figsize=(13, 10))
-    plt.scatter(np.where(positives)[0], raw_fluorescence_vals[positives], color='blue', label='Positives', s=20, marker="*", linewidths=1)
-    plt.scatter(np.where(negatives)[0], raw_fluorescence_vals[negatives], color='grey', label='Negatives', s=20, marker="x", linewidths=1)
+    idx = np.arange(len(raw_vals))
+    plt.scatter(idx[positives], raw_vals[positives],
+                color="blue", marker="*",  s=20, label="Positives", linewidths=1)
+    plt.scatter(idx[negatives], raw_vals[negatives],
+                color="grey", marker="x", s=20, label="Negatives", linewidths=1)
+
+    if adaptive:
+        plt.plot(idx, positive_threshold, color="green",
+                 linestyle="dotted", linewidth=2, label="Positive Threshold")
+    else:
+        plt.axhline(y=positive_threshold, color="green",
+                    linestyle="dotted", linewidth=2,
+                    label="Positive Threshold")
+
     if rain:
-        plt.scatter(np.where(rain_mask)[0], raw_fluorescence_vals[rain_mask], color='red', label='Rain', s=20, marker="+", linewidths=1)
-        plt.axhline(y=rain_threshold, color='orange', linestyle='dotted', linewidth=2, label='Rain Threshold')
-        plt.text(0.95, rain_threshold + (positive_threshold - rain_threshold) / 2, 
-                 f'Rain: {rain_count} ({rain_percentage:.2f}%)', 
-                 transform=plt.gca().transAxes, fontsize=12, color='red', verticalalignment='center', horizontalalignment='right')
+        plt.scatter(idx[rain_mask], raw_vals[rain_mask],
+                    color="red", marker="+", s=20, label="Rain", linewidths=1)
+        plt.axhline(y=rain_threshold, color="orange",
+                    linestyle="dotted", linewidth=2, label="Rain Threshold")
 
-    plt.axhline(y=positive_threshold, color='green', linestyle='dotted', linewidth=2, label='Positive Threshold')
-    plt.text(0.95, positive_threshold + (max(raw_fluorescence_vals) - positive_threshold) * 0.05, 
-             f'Positives: {positive_count} ({positive_percentage:.2f}%)', 
-             transform=plt.gca().transAxes, fontsize=12, color='blue', verticalalignment='bottom', horizontalalignment='right')
-
-    plt.text(0.95, (rain_threshold - (rain_threshold - min(raw_fluorescence_vals)) * 0.05) if rain else 0, 
-             f'Negatives: {negative_count} ({negative_percentage:.2f}%)', 
-             transform=plt.gca().transAxes, fontsize=12, color='grey', verticalalignment='top', horizontalalignment='right')
-
-    plt.xlabel('Well Number')
-    plt.ylabel('Normalized Start Intensity')
-    plt.legend(loc='upper left')
-    plt.title('Fluorescence Intensity Distribution')
+    plt.xlabel("Well Number")
+    plt.ylabel("Normalized Start Intensity")
+    plt.title(f"Fluorescence Intensity Distribution"
+              f"{' - ' + frame_name if frame_name else ''}")
+    plt.legend(loc="upper left")
     plt.show()
 
-    positive_idxs = np.argwhere(positives.squeeze())
-    negative_idxs = np.argwhere(negatives.squeeze())
-    positive_pos = all_pos_seq[0][positive_idxs].squeeze()
-    negative_pos = all_pos_seq[0][negative_idxs].squeeze()
-
+    pos_idx  = np.argwhere(positives.squeeze())
+    neg_idx  = np.argwhere(negatives.squeeze())
+    pos_xy   = all_pos_seq[0][pos_idx].squeeze()
+    neg_xy   = all_pos_seq[0][neg_idx].squeeze()
 
     if rain:
-        rain_idxs = np.argwhere(rain_mask.squeeze())
-        rain_pos = all_pos_seq[0][rain_idxs].squeeze()
-        if return_positive_fluorescence:
-            return positive_idxs.squeeze(), rain_idxs.squeeze(), negative_idxs.squeeze(), positive_pos, rain_pos, negative_pos, raw_fluorescence_vals
-        else:
-            return positive_idxs.squeeze(), rain_idxs.squeeze(), negative_idxs.squeeze(), positive_pos, rain_pos, negative_pos
+        rain_idx = np.argwhere(rain_mask.squeeze())
+        rain_xy  = all_pos_seq[0][rain_idx].squeeze()
     else:
-        dummy_rain_idx = np.array([], dtype="bool")
-        dummy_rain_pos = np.array([])
-        if return_positive_fluorescence:
-            return positive_idxs.squeeze(), dummy_rain_idx, negative_idxs.squeeze(), positive_pos, dummy_rain_pos, negative_pos, raw_fluorescence_vals
-        else:
-            return positive_idxs.squeeze(), dummy_rain_idx, negative_idxs.squeeze(), positive_pos, dummy_rain_pos, negative_pos
+        rain_idx = np.array([], dtype=int)
+        rain_xy  = np.array([])
+
+    if return_positive_fluorescence:
+        return (pos_idx.squeeze(), rain_idx.squeeze(), neg_idx.squeeze(),
+                pos_xy,       rain_xy,         neg_xy,
+                raw_vals)
+    else:
+        return (pos_idx.squeeze(), rain_idx.squeeze(), neg_idx.squeeze(),
+                pos_xy,       rain_xy,         neg_xy)
+    
+
+
+
+
+
 
 
 
@@ -2913,6 +2965,24 @@ def anomaly_filter_by_autoencoder(data, model, contamination):
     return normal_mask, anomaly_mask
 
 
+def compute_distance_matrix(
+    df_A: pd.DataFrame,
+    df_B: pd.DataFrame,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return two |A|×|B| matrices:
+    • **dL** – absolute ΔLowTm between every pair (Aᵢ, Bⱼ)
+    • **dH** – absolute ΔHighTm between every pair
+
+    These are compared *component‑wise* against the LUT‑derived caps.
+    """
+    a = df_A[["LowTm", "HighTm"]].to_numpy()
+    b = df_B[["LowTm", "HighTm"]].to_numpy()
+
+    # Broadcast subtraction → shape (|A|, |B|, 2), then split axes
+    diff = a[:, None, :] - b[None, :, :]
+    dL = np.abs(diff[:, :, 0])  # LowTm component
+    dH = np.abs(diff[:, :, 1])  # HighTm component
+    return dL, dH
 
 
 def split_dataframe_by_columns(df, columns):
@@ -4663,7 +4733,7 @@ def load_data(folder_path: str = "raw_data") -> Dict[str, Any]:
 
 
 def print_version():
-    print("Currently running 01312025 version")
+    print("Currently running 04072026 version")
 
 
 
