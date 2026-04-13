@@ -1,4 +1,4 @@
-# MpMTB
+# MpMTB (Multiplexed Melting Temperature Barcodes)
 
 ## Overview
 MpMTB is a comprehensive Python-based analysis pipeline for processing and analyzing thermal fluorescence microscopy data, with a focus on EvaGreen-based qPCR applications. The project provides tools for image processing, well detection, fluorescence tracking, melting temperature (Tm) calculation, and hierarchical clustering of PCR probes.
