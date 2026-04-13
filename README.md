@@ -1,187 +1,138 @@
-# ThermoOmniFlux
+# MpMTB
 
-A Python-based analysis pipeline for **thermal digital PCR (dPCR) fluorescence microscopy data**, tailored to ThermoOmniFlux systems. The repository provides Jupyter notebooks and a supporting utility library for processing raw CZI/TIFF microscopy images, extracting melting temperatures (Tm) from single-molecule melting profiles, and performing downstream molecule identification via clustering.
+## Overview
+MpMTB is a comprehensive Python-based analysis pipeline for processing and analyzing thermal fluorescence microscopy data, with a focus on EvaGreen-based qPCR applications. The project provides tools for image processing, well detection, fluorescence tracking, melting temperature (Tm) calculation, and hierarchical clustering of PCR probes.
 
----
+## Features
+
+### Core Processing Pipeline (`EvaGreen_Based_Processing_Pipeline.ipynb`)
+- **Image I/O**: Convert TIFF and CZI microscopy files to NumPy arrays with metadata extraction
+- **Well Detection**: Automated identification of microplate wells in fluorescence images
+- **Background Correction**: Gaussian background subtraction and image normalization
+- **Keypoint Tracking**: Track fluorescent spots across image sequences with multi-channel support
+- **Fluorescence Analysis**: Extract and smooth fluorescence time-series data
+- **Melting Curve Processing**: Calculate melting temperatures with peak detection and filtering
+- **Probe Classification**: Distinguish positive signals from background noise
+
+### Advanced Analysis (`Pooling_Clustering.ipynb`)
+- **Hierarchical Clustering**: Group similar PCR probes using scipy linkage methods
+- **Signal Clustering**: K-means clustering of fluorescence signals
+- **Tm Distribution Analysis**: Visualize and analyze melting temperature distributions
+- **Multi-probe Analysis**: Handle multiple amplicon targets with expected Tm values
+- **Interactive Filtering**: Threshold-based filtering with interactive widgets
 
 ## Project Structure
 
 ```
-ThermoOmniFlux/
-├── README.md
-├── utils.py                                        # Core utility library (all processing functions)
+├── README.md                               # This file
+├── utils.py                                # Core utility functions (4700+ lines)
 └── jupyter_notebooks/
-    ├── Image_Processing_Pipeline.ipynb              # End-to-end image processing workflow
-    ├── Pooling_Clustering.ipynb                     # Multi-area pooled clustering and analysis
-    └── Direct_Clustering.ipynb                      # Single-area clustering (no pooling)
+    ├── EvaGreen_Based_Processing_Pipeline.ipynb   # Main processing workflow
+    └── Pooling_Clustering.ipynb                   # Clustering and analysis
 ```
-
----
-
-## Notebooks
-
-### `Image_Processing_Pipeline.ipynb`
-
-The primary notebook. Walks through the full analysis from raw microscopy images to per-molecule melting temperature profiles. Supports multi-channel CZI image stacks (EvaGreen, HEX, Cy5, ROX, etc.) with interactive parameter tuning and visualizations at each stage.
-
-**Sections include:**
-- File loading and CZI metadata extraction (channels, exposure times, laser intensities)
-- Well detection via GPU-accelerated convolution (PyTorch, with MPS/CPU fallback)
-- Keypoint tracking and alignment across frames
-- Positive / rain / negative well partitioning (KMeans-based fluorescence thresholding)
-- Background subtraction (neighborhood-based and Wittwer exponential methods)
-- Savitzky-Golay smoothing and -dF/dT derivative computation
-- Multi-level melting temperature (Tm) determination with adaptive noise floors
-- Per-channel Tm probe signal processing (shape filtering, anomaly detection, local Tm extraction)
-- Final results compilation and export to CSV / NumPy formats
-
-### `Pooling_Clustering.ipynb`
-
-Secondary analysis notebook for experiments with **multiple imaging areas** (e.g., multiple chips or fields of view). Aggregates Tm results from the image processing pipeline, aligns datasets across areas to correct for batch effects, and performs molecule identification.
-
-**Key steps:**
-1. Load per-area Tm result CSVs from the processing pipeline
-2. Align Tm distributions across imaging areas using grid-based registration (`align_datasets`, `apply_global_shift`)
-3. Align observed Tm values with predicted Tm barcodes
-4. Molecule identification via Greedy Surjective Matching
-5. Cluster refinement with Gaussian Mixture Models (GMM) or KMeans
-6. Interactive cluster visualization and quantification (Dash-powered scatter plots)
-7. Export aligned data and per-molecule statistics
-
-### `Direct_Clustering.ipynb`
-
-A streamlined variant of `Pooling_Clustering.ipynb` for experiments with a **single imaging area**. Skips the multi-area pooling and alignment steps and proceeds directly to matching and clustering against predicted Tm barcodes.
-
----
-
-## `utils.py` — Core Library
-
-All functions called by the notebooks are defined here. The library is organized into the following functional groups:
-
-| Category | Key Functions | Description |
-|---|---|---|
-| **Image I/O** | `tiff_to_arr`, `retrieve_czi_metadata`, `parse_filename` | Load TIFF/CZI images, extract metadata (channels, filters, exposure times) |
-| **Preprocessing** | `gaussian_background_correction`, `invert_image`, `gaussian_background_correction_div` | Gaussian background correction and image inversion |
-| **Well Detection** | `_find_well`, `find_well_new_no_tile`, `generate_pos_seq_new_no_tile` | GPU-accelerated well localization using Gaussian convolution + non-max suppression (PyTorch) |
-| **Keypoint Tracking** | `track_keypoints`, `track_keypoints_multi_channel`, `filter_keypoints` | Track well positions across frames; multi-channel support |
-| **Partitioning** | `define_the_rain`, `define_the_rain_kmeans` | Classify wells as positive / rain / negative using KMeans fluorescence thresholding (with optional adaptive windowed mode) |
-| **Signal Processing** | `savgol`, `generate_fluorescence_vs_time`, `get_average_pixel_values_circ`, `gaussian_smooth`, `min_max_normalize` | Extract fluorescence time series, Savitzky-Golay filtering, Gaussian smoothing, normalization |
-| **Background Subtraction** | `subtract_background`, `wittwer_background_subtract` | Neighborhood-based median subtraction; Wittwer exponential background model |
-| **Tm Extraction** | `get_Tm`, `get_Tm_lvl2`, `compute_Tm`, `get_noise_floor`, `compute_local_tms` | Multi-level Tm determination from -dF/dT curves with adaptive noise floors and peak finding |
-| **Probe Analysis** | `probe_filter_by_shape`, `interactive_probe_filtering`, `interactive_probe_clustering_thresholding` | Shape-based probe signal filtering, interactive clustering with ipywidgets |
-| **Anomaly Detection** | `interactive_anomaly_filtering`, `anomaly_filter_by_isolation_forest`, `anomaly_filter_by_lof`, `anomaly_filter_by_one_class_svm`, `train_autoencoder` | Isolation Forest, LOF, One-Class SVM, and autoencoder-based outlier removal |
-| **Dataset Alignment** | `align_datasets`, `apply_global_shift`, `create_grid`, `grid_transform` | Cross-area Tm distribution alignment via grid-based registration and global shift correction |
-| **Clustering** | `greedy_surjective_constrained_matching`, `refine_clusters` | Greedy surjective matching against predicted Tm barcodes; GMM / KMeans cluster refinement |
-| **Visualization** | `plot_matching`, `plot_matching_interactive`, `scatter_plot_dfs`, `plot_tm_levels`, `interactive_visual_QC` | Static and interactive (Dash / ipywidgets) plots for QC, matching results, and Tm distributions |
-| **Data Assembly** | `join_all_tms`, `join_meta_data`, `update_cluster_assignment`, `save_data`, `load_data` | Combine Tm, position, fluorescence, and confidence data; save/load pickle archives |
-
-> **Tip:** Run `help(utils.<function_name>)` in any notebook cell to view a function's full docstring and parameter descriptions.
-
----
-
-## General Workflow
-
-```
- ┌─────────────────────────────────────────────────────────────────────┐
- │                  Image_Processing_Pipeline.ipynb                    │
- │                                                                     │
- │  Raw CZI/TIFF ─► Well Detection ─► Tracking ─► Partitioning         │
- │       │                                              │              │
- │       │         Background Subtraction ◄─────────────┘              │
- │       │              │                                              │
- │       │         -dF/dT Derivative                                   │
- │       │              │                                              │
- │       │         Tm Determination (Multi-Level)                      │
- │       │              │                                              │
- │       │         Per-Channel Probe Tm Extraction                     │
- │       │              │                                              │
- │       └──────── Results CSV ────────────────────────────────────►   │
- └─────────────────────────────────────────────────────────────────────┘
-                            │
-              ┌─────────────┴──────────────┐
-              ▼                            ▼
- ┌───────────────────────┐    ┌───────────────────────────┐
- │  Direct_Clustering    │    │  Pooling_Clustering       │
- │  (single area)        │    │  (multiple areas)         │
- │                       │    │                           │
- │  Load Tm results      │    │  Load per-area results    │
- │  Align w/ predictions │    │  Align across areas       │
- │  Greedy Matching      │    │  Align w/ predictions     │
- │  GMM/KMeans Refine    │    │  Greedy Matching          │
- │  Quantify & Export    │    │  GMM/KMeans Refine        │
- └───────────────────────┘    │  Quantify & Export        │
-                              └───────────────────────────┘
-```
-
-
-## Configurable Parameters
-
-### Image Processing
-
-| Parameter | Description | Guidance |
-|---|---|---|
-| `k0` | Kernel size for first Gaussian convolution (pixels, odd) | Set based on microscope magnification and well size. Reference values provided in notebook. |
-| `k1` | Kernel size for second convolution / locality (pixels, odd) | Controls non-max suppression neighborhood. Typically similar to or larger than `k0`. |
-| `pixel_range` | Radius for fluorescence extraction (pixels) | Set according to well diameter. Generally ≥ `k0`. |
-| `merge_threshold` | Max distance to merge detections across rounds (pixels) | Controls duplicate suppression in multi-round detection. |
-| `eps` | Search radius for frame-to-frame alignment (pixels) | Max displacement between consecutive frames. |
-| `n_SD` | Standard deviations for positive/rain threshold | Higher values = stricter partitioning. Adjust based on image SNR. |
-
-### Tm Computation
-
-| Parameter | Description | Guidance |
-|---|---|---|
-| `heating_rate_per_min` | Temperature ramp rate (C/min) | Must match experimental protocol. |
-| `exposure_in_sec` | Time between consecutive frames (seconds) | Must match camera acquisition settings. |
-| `window_length` | Savitzky-Golay smoothing window (frames, odd) | Wider = smoother curves but lower resolution. Adjust based on melt transition width and noise. |
-| `initial_T` / `final_T` | Temperature range of the melt ramp (C) | Set to match heating plate start and end temperatures. |
-| `weight` | Noise floor blending weight (0-1) | Balances empirical vs. fitted noise floor. Default 0.5. |
-| `height_tolerance` | Peak height comparison tolerance | Controls strictness of two-peak validation. |
-
-### Clustering
-
-| Parameter | Description | Guidance |
-|---|---|---|
-| `max_cost_threshold` | Maximum distance for greedy matching | Controls how far an observation can be from a predicted barcode and still be assigned. |
-| `max_shift_x` / `max_shift_y` | Maximum alignment shift (Tm units) | Bounds on cross-area Tm correction. |
-| `std_x` / `std_y` | Gaussian ellipse standard deviations for interactive clustering | Controls cluster boundary visualization. |
-
----
 
 ## Dependencies
 
-| Category | Packages |
-|---|---|
-| **Image I/O** | PIL (Pillow), czifile |
-| **Numerical** | NumPy, SciPy |
-| **Data** | Pandas |
-| **Machine Learning** | Scikit-learn (KMeans, GMM, Isolation Forest, LOF, One-Class SVM) |
-| **Deep Learning** | PyTorch (GPU-accelerated well detection, autoencoder anomaly filtering) |
-| **Visualization** | Matplotlib, Seaborn, Plotly, Dash |
-| **Interactive Widgets** | ipywidgets, IPython |
-| **Progress** | tqdm |
+### Core Libraries
+- **Image Processing**: PIL, CziFile
+- **Numerical Computing**: NumPy, SciPy, Scikit-learn
+- **Machine Learning**: PyTorch, scikit-learn (clustering, outlier detection)
+- **Visualization**: Matplotlib, Seaborn, Plotly, Dash
+- **Data Analysis**: Pandas
+- **Progress Tracking**: tqdm
+- **Interactive Widgets**: IPywidgets
 
-### Setting Up the Environment
+See imports in `utils.py` for complete dependency list.
 
-```bash
-conda env create -f environment.yml
-conda activate thermoomniflux
-```
+## Key Modules in utils.py
 
-This creates a conda environment named `thermoomniflux` with all necessary packages pre-configured.
+### Image Processing
+- `tiff_to_arr()`: Convert TIFF files to numpy arrays
+- `retrieve_czi_metadata()`: Extract CZI file metadata
+- `invert_image()`, `gaussian_background_correction()`: Image preprocessing
+- `find_well_new_no_tile()`: Well detection in microplates
 
----
+### Keypoint Tracking
+- `track_keypoints()`, `track_keypoints_multi_channel()`: Track fluorescent spots across frames
+- `filter_keypoints()`: Remove spurious detections
+- `plot_keypoint_tracking()`: Visualize tracking results
 
-## Quick Start
+### Fluorescence Analysis
+- `generate_fluorescence_vs_time()`: Extract intensity time-series
+- `get_average_pixel_values_circ()`: Calculate circular region intensities with Gaussian weighting
+- `savgol()`: Savitzky-Golay filtering of signals
+- `snr_moving_avg()`: Signal-to-noise ratio calculation
 
-1. **Set up the environment** using the conda instructions above
-2. **Open** `Image_Processing_Pipeline.ipynb` in Jupyter
-3. **Configure** the image file paths and experimental parameters (heating rate, exposure time, temperature range, kernel sizes)
-4. **Run cells sequentially** to process images and extract Tm values — interactive widgets allow real-time parameter tuning
-5. **Open** `Pooling_Clustering.ipynb` (multi-area) or `Direct_Clustering.ipynb` (single area) to perform molecule identification and visualization
+### Melting Temperature Calculation
+- `compute_Tm()`: Calculate Tm from frame index and heating rate
+- `get_Tm()`: Advanced Tm extraction with peak detection
+- `get_Tm_lvl2()`: Multi-peak Tm detection
+- `compute_local_tms()`: Per-probe Tm calculation
+- `get_noise_floor()`: Determine signal threshold
 
----
+### Clustering & Filtering
+- `cluster_signals()`: Hierarchical clustering of fluorescence profiles
+- `probe_filter_by_shape()`: Filter probes based on signal shape
+- `filter_local_tms()`: Resolve ambiguous Tm values
+- `visualize_probe_clusters()`: Cluster visualization
+
+### Data Assembly
+- `join_all_tms()`: Combine local and global Tm data
+- `join_meta_data()`: Create output DataFrame with position and confidence metrics
+
+## Usage
+
+### Basic Workflow
+1. **Load Images**: Use `tiff_to_arr()` or CziFile to load microscopy data
+2. **Preprocess**: Apply background correction with `gaussian_background_correction()`
+3. **Detect Wells**: Find well positions using `find_well_new_no_tile()`
+4. **Track Spots**: Monitor fluorescent spots with `track_keypoints()`
+5. **Extract Tm**: Calculate melting temperatures with `get_Tm()` or `compute_local_tms()`
+6. **Cluster & Filter**: Group similar probes with `cluster_signals()` and filter with probe shape criteria
+7. **Export Results**: Combine metadata and Tm values with `join_meta_data()`
+
+### Interactive Analysis
+Use the Jupyter notebooks for step-by-step exploration:
+- Adjust parameters interactively with IPywidgets sliders
+- Visualize intermediate results (images, tracking overlays, curves)
+- Export processed data to CSV/DataFrame format
+
+## Configuration Parameters
+
+Common tuning parameters:
+- `pix_range`: Circular region size for fluorescence extraction
+- `n_SD`: Number of standard deviations for noise floor threshold
+- `heating_rate_per_min`: Temperature increase rate (°C/min)
+- `exposure_in_sec`: Time between consecutive frames
+- `num_clusters`: Number of clusters for K-means analysis
+- `savgol_window`: Smoothing window length for Savitzky-Golay filter
+
+## Output
+
+The pipeline generates:
+- **Melting Temperatures (Tm)**: Per-probe calculated Tm values with confidence scores
+- **Fluorescence Profiles**: Time-series intensity data per well/probe
+- **Position Data**: (x, y) coordinates of detected wells
+- **Cluster Assignments**: Grouping of similar probe signals
+- **Visualizations**: PNG plots of processing steps and final results
+- **DataFrame**: Consolidated output with all metadata
+
+## Performance Notes
+
+- Processes multi-channel fluorescence data
+- Handles multi-peak detection for multiplexed PCR assays
+- Supports hierarchical filtering for ambiguous Tm values
+- Interactive parameter optimization via Jupyter widgets
+- Visualization tools for result validation
+
+## Citation & Attribution
+
+Part of the Weitz Lab research on thermal analysis and microfluidic systems.
 
 ## License
 
+[Add appropriate license information]
+
 ## Contact
+
+Will [Add contact information]
